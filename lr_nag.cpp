@@ -52,10 +52,10 @@ usint NUM_ITERS_DEF(200);
 usint WRITE_EVERY(10);
 bool WITH_BT_DEF(true);
 int ROWS_TO_READ_DEF(-1);   //Note this is to verify zero padding
-std::string TRAIN_X_FILE_DEF = "train_data/X_norm_1024.csv";
-std::string TRAIN_Y_FILE_DEF = "train_data/y_1024.csv";
-std::string TEST_X_FILE_DEF = "train_data/X_norm.csv";
-std::string TEST_Y_FILE_DEF = "train_data/y.csv";
+std::string TRAIN_X_FILE_DEF = "cscore_data/X_train_79999.csv";
+std::string TRAIN_Y_FILE_DEF = "cscore_data/y_train_79999.csv";
+std::string TEST_X_FILE_DEF = "cscore_data/X_test_20000.csv";
+std::string TEST_Y_FILE_DEF = "cscore_data/y_test_20000.csv";
 uint32_t RING_DIM_DEF(1 << 17);
 float LR_GAMMA(0.1);  // Learning Rate
 float LR_ETA(0.1);   // Learning Rate
