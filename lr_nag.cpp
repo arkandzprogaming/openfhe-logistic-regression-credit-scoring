@@ -57,8 +57,8 @@ std::string TRAIN_Y_FILE_DEF = "cscore_data/y_train_79999.csv";
 std::string TEST_X_FILE_DEF = "cscore_data/X_test_20000.csv";
 std::string TEST_Y_FILE_DEF = "cscore_data/y_test_20000.csv";
 uint32_t RING_DIM_DEF(1 << 17);
-float LR_GAMMA(0.1);  // Learning Rate
-float LR_ETA(0.1);   // Learning Rate
+float LR_GAMMA(0.001);  // Learning Rate
+float LR_ETA(0.5);   // Learning Rate
 
 // Note: the ranges were chosen based on empirical observations.
 //    Depending on your application, the estimation ranges may change.
