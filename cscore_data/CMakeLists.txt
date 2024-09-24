@@ -1,0 +1,5 @@
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/X_train_79999.csv       ${CMAKE_CURRENT_BINARY_DIR}/. COPYONLY)
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/y_train_79999.csv       ${CMAKE_CURRENT_BINARY_DIR}/. COPYONLY)
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/X_test_20000.csv        ${CMAKE_CURRENT_BINARY_DIR}/. COPYONLY)
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/y_test_20000.csv        ${CMAKE_CURRENT_BINARY_DIR}/. COPYONLY)
+
