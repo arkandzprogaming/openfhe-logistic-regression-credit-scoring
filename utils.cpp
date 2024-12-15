@@ -228,7 +228,7 @@ CT Mat2CtMRM(CC &cc, const Mat &inMat, const int rowSize, const int numSlots, co
   // inMat is currently a Mat: vector nrows long of vectors (ncol long)
   // so this storage requirement is differnt, instead of rowSize as a limit this packed with colSize as the width limit.
 
-  OPENFHE_DEBUG_FLAG(false);
+  OPENFHE_DEBUG_FLAG(true);
   OPENFHE_DEBUG("in Mat2CtMRM");
   int origNumRows = inMat.size();     //n_samp (note transposed)
   int origNumCols = inMat[0].size();  //n_feat (including the intecept column)
