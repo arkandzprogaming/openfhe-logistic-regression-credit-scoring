@@ -56,7 +56,7 @@ std::string TRAIN_X_FILE_DEF = "cscore_data/X_train_1024.csv";
 std::string TRAIN_Y_FILE_DEF = "cscore_data/y_train_1024.csv";
 std::string TEST_X_FILE_DEF = "cscore_data/X_test_1024.csv";
 std::string TEST_Y_FILE_DEF = "cscore_data/y_test_1024.csv";
-uint32_t RING_DIM_DEF(1 << 17);
+uint32_t RING_DIM_DEF(1 << 16);
 float LR_GAMMA(0.001);  // Learning Rate
 float LR_ETA(0.5);   // Learning Rate
 
