@@ -52,16 +52,13 @@ usint NUM_ITERS_DEF(200);
 usint WRITE_EVERY(10);
 bool WITH_BT_DEF(true);
 int ROWS_TO_READ_DEF(-1);   //Note this is to verify zero padding
-std::string TRAIN_X_FILE_DEF = "train_data/X_norm_1024.csv";
-std::string TRAIN_Y_FILE_DEF = "train_data/y_1024.csv";
-std::string TEST_X_FILE_DEF = "train_data/X_norm.csv";
-std::string TEST_Y_FILE_DEF = "train_data/y.csv";
-uint32_t RING_DIM_DEF(1 << 17);
-float LR_GAMMA(0.1);  // Learning Rate
-float LR_ETA(0.1);   // Learning Rate
-bool WITH_COMPOSITESCALING(false);
-bool WITH_DBPRECISION_CS(false);
-bool HIGHPRECISION_CS(false);
+std::string TRAIN_X_FILE_DEF = "cscore_data/X_train_1024.csv";
+std::string TRAIN_Y_FILE_DEF = "cscore_data/y_train_1024.csv";
+std::string TEST_X_FILE_DEF = "cscore_data/X_test_1024.csv";
+std::string TEST_Y_FILE_DEF = "cscore_data/y_test_1024.csv";
+uint32_t RING_DIM_DEF(1 << 16);
+float LR_GAMMA(0.001);  // Learning Rate
+float LR_ETA(0.5);   // Learning Rate
 
 // Note: the ranges were chosen based on empirical observations.
 //    Depending on your application, the estimation ranges may change.
@@ -127,8 +124,7 @@ int main(int argc, char *argv[]) {
   Parameters params{};
   params.populateParams(argc, argv, NUM_ITERS_DEF, WITH_BT_DEF, ROWS_TO_READ_DEF,
                         TRAIN_X_FILE_DEF, TRAIN_Y_FILE_DEF, TEST_X_FILE_DEF, TEST_Y_FILE_DEF,
-                        RING_DIM_DEF, WRITE_EVERY, BOOTSTRAP_PRECISION_DEF, false, 
-                        WITH_COMPOSITESCALING, WITH_DBPRECISION_CS, HIGHPRECISION_CS
+                        RING_DIM_DEF, WRITE_EVERY, BOOTSTRAP_PRECISION_DEF, false
   );
 
   /////////////////////////////////////////////////////////
@@ -141,7 +137,7 @@ int main(int argc, char *argv[]) {
     std::cerr << "Could not open file to write train loss to " << params.lossOutFile << std::endl;
     exit(EXIT_FAILURE);
   }
-  ofsloss << "Epoch, Time(s), Loss, Accuracy, Precision, Recall, F1-Score, ROC-AUC" << std::endl;
+  ofsloss << "Time Taken(s), " << "Train Losses" << std::endl;
 
   std::ofstream weightOFS;
   weightOFS.precision(params.outputPrecision);
@@ -151,27 +147,17 @@ int main(int argc, char *argv[]) {
     std::cerr << "Couldn't open file to write weights to";
     exit(EXIT_FAILURE);
   }
-  weightOFS << "Epoch, Weights..." << std::endl;
+  weightOFS << "Weights" << std::endl;
 
   std::ofstream testOFS;
   testOFS.precision(params.outputPrecision);
   testOFS.open(params.testLossOutFile, std::ofstream::out | std::ofstream::trunc);
   if (!testOFS.is_open()) {
-    std::cerr << "Couldn't open file to write test metrics to";
+    std::cerr << "Couldn't open file to write test loss to";
     exit(EXIT_FAILURE);
   }
-  testOFS << "Epoch, Loss, Accuracy, Precision, Recall, F1-Score, ROC-AUC" << std::endl;
+  testOFS << "Test Losses" << std::endl;
 
-  // New file for training metrics
-  std::ofstream trainMetricsOFS;
-  trainMetricsOFS.precision(params.outputPrecision);
-  std::string trainMetricsFile = params.outFilePrefix + "train_metrics.csv";
-  trainMetricsOFS.open(trainMetricsFile, std::ofstream::out | std::ofstream::trunc);
-  if (!trainMetricsOFS.is_open()) {
-    std::cerr << "Couldn't open file to write training metrics to";
-    exit(EXIT_FAILURE);
-  }
-  trainMetricsOFS << "Epoch, Loss, Accuracy, Precision, Recall, F1-Score, ROC-AUC" << std::endl;
 
   /////////////////////////////////////////////////////////
   // Crypto CryptoParams
@@ -193,27 +179,6 @@ int main(int argc, char *argv[]) {
   uint32_t batchSize = params.ringDimension / 2;
   lbcrypto::ScalingTechnique rsTech = lbcrypto::FIXEDAUTO;
   lbcrypto::KeySwitchTechnique ksTech = lbcrypto::HYBRID;
-
-  // Reset parameter values for COMPOSITESCALING scaling technique
-  uint32_t registerWordSize = 32;
-  if (params.withCS) {
-    rsTech = lbcrypto::COMPOSITESCALINGAUTO;
-    
-    if (params.hPrecisionCS) {
-      dcrtBits = 90;
-      firstModSize = 91;
-      securityLevel = lbcrypto::HEStd_NotSet;
-    }    
-    
-    if (params.dbPrecisionCS) {
-      registerWordSize = 64;
-    } 
-
-    std::cout << "Using Composite Scaling Technique with " << registerWordSize << "-bit register size." << std::endl;
-    std::cout << "Scaling factor: " << firstModSize << " (p0), " << dcrtBits << " (p)" << std::endl; 
-    std::cout << "Lambda: " << std::to_string(securityLevel) << std::endl;
-    std::cout << "Ring Size: " << params.ringDimension << std::endl;
-  }
 
   CryptoParams parameters;
   std::vector<uint32_t> levelBudget;
@@ -281,8 +246,6 @@ int main(int argc, char *argv[]) {
   parameters.SetNumLargeDigits(numLargeDigits);
   parameters.SetFirstModSize(firstModSize);
   parameters.SetMaxRelinSkDeg(maxRelinSkDeg);
-  parameters.SetRegisterWordSize(registerWordSize);
-  
 
   CC cc;
   cc = GenCryptoContext(parameters);
@@ -502,38 +465,21 @@ int main(int argc, char *argv[]) {
       }
       std::cout << std::endl;
 
+      auto loss = ComputeLoss(final_b, X, y);
       /////////////////////////////////////////////////////////////////
-      // Compute training performance metrics
+      //Saving and logging information
       /////////////////////////////////////////////////////////////////
-      PerformanceMetrics trainMetrics = ComputeAllMetrics(final_b, X, y);
-      
+
       auto epochTime = TOC(t);
       totalTime += epochTime;
 
-      std::cout << "\tTraining Metrics:" << std::endl;
-      std::cout << "\t  Loss: " << trainMetrics.loss << std::endl;
-      std::cout << "\t  Accuracy: " << trainMetrics.accuracy << std::endl;
-      std::cout << "\t  Precision: " << trainMetrics.precision << std::endl;
-      std::cout << "\t  Recall: " << trainMetrics.recall << std::endl;
-      std::cout << "\t  F1-Score: " << trainMetrics.f1_score << std::endl;
-      std::cout << "\t  ROC-AUC: " << trainMetrics.roc_auc << std::endl;
-      std::cout << "\t  Time: " << epochTime / 1000.0 << " s" << std::endl;
-
-      /////////////////////////////////////////////////////////////////
-      //Saving training metrics
-      /////////////////////////////////////////////////////////////////
-      ofsloss << epochI << ", " << epochTime << ", " << trainMetrics.loss 
-              << ", " << trainMetrics.accuracy << ", " << trainMetrics.precision 
-              << ", " << trainMetrics.recall << ", " << trainMetrics.f1_score 
-              << ", " << trainMetrics.roc_auc << std::endl;
-
-      trainMetricsOFS << epochI << ", " << trainMetrics.loss << ", " 
-                      << trainMetrics.accuracy << ", " << trainMetrics.precision 
-                      << ", " << trainMetrics.recall << ", " << trainMetrics.f1_score 
-                      << ", " << trainMetrics.roc_auc << std::endl;
+      std::cout << "\tLoss: " << loss << "\t took: "
+                << epochTime / 1000.0 << " s" << std::endl;
+      OPENFHE_DEBUG(loss);
+      ofsloss << epochTime << ", " << loss << std::endl;
 
       if (epochI % WRITE_EVERY == 0 && epochI > 0) {
-        std::cout << "\t Writing weights and test metrics to files: " << "(" <<
+        std::cout << "\t Writing weights and test loss to files: " << "(" <<
                   params.weightsOutFile << ", " << params.testLossOutFile << ")" << std::endl;
         /////////////////////////////////////////////////////////////////
         // Writing the weights
@@ -545,25 +491,13 @@ int main(int argc, char *argv[]) {
           weightOFS << singletonWeight[0] << ",";
         }
         weightOFS << std::endl;
-        
         /////////////////////////////////////////////////////////////////
-        // Computing and Writing Test Metrics
+        // Writing the Test Loss
         /////////////////////////////////////////////////////////////////
-        OPENFHE_DEBUG("Computing test metrics");
-        PerformanceMetrics testMetrics = ComputeAllMetrics(final_b, testX, testY);
-        
-        std::cout << "\tTest Metrics:" << std::endl;
-        std::cout << "\t  Loss: " << testMetrics.loss << std::endl;
-        std::cout << "\t  Accuracy: " << testMetrics.accuracy << std::endl;
-        std::cout << "\t  Precision: " << testMetrics.precision << std::endl;
-        std::cout << "\t  Recall: " << testMetrics.recall << std::endl;
-        std::cout << "\t  F1-Score: " << testMetrics.f1_score << std::endl;
-        std::cout << "\t  ROC-AUC: " << testMetrics.roc_auc << std::endl;
-        
-        testOFS << epochI << ", " << testMetrics.loss << ", " 
-                << testMetrics.accuracy << ", " << testMetrics.precision 
-                << ", " << testMetrics.recall << ", " << testMetrics.f1_score 
-                << ", " << testMetrics.roc_auc << std::endl;
+        OPENFHE_DEBUG("Writing test loss to: " + params.testLossOutFile);
+        auto testLoss = ComputeLoss(final_b, testX, testY);
+        std::cout << "\tTest Loss: " << testLoss << std::endl;
+        testOFS << epochI << ", " << testLoss << std::endl;
       }
     }
 
@@ -579,41 +513,11 @@ int main(int argc, char *argv[]) {
     auto inferenceDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
         epochInferenceEnd - epochInferenceStart
     );
-    std::cout << "\t***Iteration: " << epochI << "\tInference time: " << inferenceDuration.count() << " ms" << std::endl;
+    std::cout << "\t***Iteration: " << epochI << "\tInference time: " << inferenceDuration.count() << " seconds" << std::endl;
   }
-  
-  /////////////////////////////////////////////////////////////////
-  // Final metrics computation and display
-  /////////////////////////////////////////////////////////////////
-  std::cout << std::endl << "=== FINAL RESULTS ===" << std::endl;
-  
-  PerformanceMetrics finalTrainMetrics = ComputeAllMetrics(final_b, X, y);
-  std::cout << "Final Training Metrics:" << std::endl;
-  std::cout << "  Loss: " << finalTrainMetrics.loss << std::endl;
-  std::cout << "  Accuracy: " << finalTrainMetrics.accuracy << std::endl;
-  std::cout << "  Precision: " << finalTrainMetrics.precision << std::endl;
-  std::cout << "  Recall: " << finalTrainMetrics.recall << std::endl;
-  std::cout << "  F1-Score: " << finalTrainMetrics.f1_score << std::endl;
-  std::cout << "  ROC-AUC: " << finalTrainMetrics.roc_auc << std::endl;
-
-  PerformanceMetrics finalTestMetrics = ComputeAllMetrics(final_b, testX, testY);
-  std::cout << std::endl << "Final Test Metrics:" << std::endl;
-  std::cout << "  Loss: " << finalTestMetrics.loss << std::endl;
-  std::cout << "  Accuracy: " << finalTestMetrics.accuracy << std::endl;
-  std::cout << "  Precision: " << finalTestMetrics.precision << std::endl;
-  std::cout << "  Recall: " << finalTestMetrics.recall << std::endl;
-  std::cout << "  F1-Score: " << finalTestMetrics.f1_score << std::endl;
-  std::cout << "  ROC-AUC: " << finalTestMetrics.roc_auc << std::endl;
-
   ofsloss.close();
   weightOFS.close();
   testOFS.close();
-  trainMetricsOFS.close();
-  
-  std::cout << std::endl << "Total Time for training " << params.numIters << " epochs was " << totalTime / 1000.0 << " s" << std::endl;
-  std::cout << "Results saved to:" << std::endl;
-  std::cout << "  Training loss & metrics: " << params.lossOutFile << std::endl;
-  std::cout << "  Training metrics only: " << trainMetricsFile << std::endl;
-  std::cout << "  Test metrics: " << params.testLossOutFile << std::endl;
-  std::cout << "  Weights: " << params.weightsOutFile << std::endl;
+  std::cout << "Total Time for training " << params.numIters << " epochs was " << totalTime / 1000.0 << " s"
+            << std::endl;
 }

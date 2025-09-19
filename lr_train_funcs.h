@@ -29,44 +29,18 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
 
-#ifndef DPRIVE_ML__LR_TRAIN_FUNCS_H_
-#define DPRIVE_ML__LR_TRAIN_FUNCS_H_
+#ifndef DPRIVE_ML_LR_TRAIN_FUNCS_H
+#define DPRIVE_ML_LR_TRAIN_FUNCS_H
 
 #include "lr_types.h"
-#include "openfhe.h"
+#include "parameters.h"
 
-////////// Function declarations related to logistic regression training on encrypted data ///////////////////////////////
+///////////////////////////////////////
+// Logistic Regression Training Functions
+///////////////////////////////////////
 
-/* Takes plaintext training data matrix X, label vector y and initial vector b input
-// and initializes logistic regression training values and parameters.
- *
- * In particular:
- * - It initializes the model weight vector beta to 0, which is going to be the vector we learn.
- *
- * X, y,  beta need to be allocated outside the function.
- * @param TBD
- * @return
- */
+Mat InitializeLogReg(Mat &X, Mat &y, float scalingFactor);
 
-Mat InitializeLogReg(Mat &X, Mat &y, float scalingFactor = 1.0);
-
-/**
- * Calculate the lr-scaled gradient. Based on the log-likelihood
- * @param cc                Cryptocontext
- * @param ctX               Features
- * @param ctNegXt           -features transposed
- * @param ctLabels          features
- * @param ctThetas           weights
- * @param ctGradStoreInto        gradients
- * @param lr                learning rate
- * @param colSize           num cols for gradient scaling
- * @param rowSize           length of row of fppe matrix
- * @param origNumSamples    Number of samples
- * @param rowKeys           keys for row operations
- * @param colKeys           keys for col operations
- * @param keys              keys for enc/dec
- * @param withBT            whether to run bootstrapping
- */
 void EncLogRegCalculateGradient(
     CC &cc,
     const CT &ctX,
@@ -74,34 +48,58 @@ void EncLogRegCalculateGradient(
     const CT &ctLabels,
     CT &ctThetas,
     CT &ctGradStoreInto,
-    usint rowSize,
+    const usint rowSize,
     const MatKeys &rowKeys,
     const MatKeys &colKeys,
     const KeyPair &keys,
-    bool debug=false,
-    int chebRangeStart = -64,
-    int chebRangeEnd = 64,
-    int chebPolyDegree = 128,
-    int debugPlaintextLength=32
-    );
+    bool debug = false,
+    int chebRangeStart = -16,
+    int chebRangeEnd = 16,
+    int chebPolyDegree = 59,
+    int debugPlaintextLength = 32
+);
 
-///////////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////
-// checks to see if all elements of the Mat inMat are within abs(x)< bound --> throws otherwise
 void BoundCheckMat(const Mat &inMat, const double bound);
-
-///////////////////////////////////////////////////////////////
-// Re-encrcypt cipher text ctx
 PT ReEncrypt(CC &cc, CT &ctx, const KeyPair &keys);
-
-///////////////////////////////////////////////////////////////
-// Returns the current Depth of CT
 int ReturnDepth(const CT &ct);
+double ComputeLoss(const Mat &b, const Mat &X, const Mat &y);
 
-///////////////////////////////////////////////////////////////
-// compute loss function
-// Formulation based off of: https://stackoverflow.com/a/47798689/18031872
-double ComputeLoss(const Mat &betas, const Mat &X, const Mat &y);
+///////////////////////////////////////
+// Performance Metrics Functions
+///////////////////////////////////////
 
-#endif //DPRIVE_ML__LR_TRAIN_FUNCS_H_
+// Generate binary predictions from probabilities using threshold
+Mat MakePredictions(const Mat &probabilities, double threshold = 0.5);
+
+// Generate probability predictions from features and weights
+Mat ComputeProbabilities(const Mat &X, const Mat &weights);
+
+// Calculate accuracy score
+double ComputeAccuracy(const Mat &y_true, const Mat &y_pred);
+
+// Calculate precision score
+double ComputePrecision(const Mat &y_true, const Mat &y_pred);
+
+// Calculate recall score
+double ComputeRecall(const Mat &y_true, const Mat &y_pred);
+
+// Calculate F1 score
+double ComputeF1Score(const Mat &y_true, const Mat &y_pred);
+
+// Calculate ROC AUC score
+double ComputeROCAUC(const Mat &y_true, const Mat &y_prob);
+
+// Structure to hold all performance metrics
+struct PerformanceMetrics {
+    double accuracy;
+    double precision;
+    double recall;
+    double f1_score;
+    double roc_auc;
+    double loss;
+};
+
+// Compute all performance metrics at once
+PerformanceMetrics ComputeAllMetrics(const Mat &weights, const Mat &X, const Mat &y, double threshold = 0.5);
+
+#endif // DPRIVE_ML_LR_TRAIN_FUNCS_H
