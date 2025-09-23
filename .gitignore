@@ -9,6 +9,7 @@ py_scripts/train_step_debugger-cpp-validation.ipynb
 __pycache__
 py_scripts/approxResults.txt
 .vscode
+*.swp
 
 .cproject
 .metadata/
